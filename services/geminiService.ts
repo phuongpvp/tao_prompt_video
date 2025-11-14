@@ -9,16 +9,13 @@ export const setApiKeys = (keys: string[]) => {
     USER_API_KEYS = keys.map(k => k.trim()).filter(k => k.length > 10);
     currentKeyIndex = 0;
 };
-
 export const clearApiKeys = () => {
     USER_API_KEYS = [];
     currentKeyIndex = 0;
 };
-
 export const hasApiKeys = (): boolean => {
     return USER_API_KEYS.length > 0;
 };
-
 const getNextApiKey = (): string => {
     if (USER_API_KEYS.length === 0) throw new Error("MISSING_KEYS");
     const key = USER_API_KEYS[currentKeyIndex];
@@ -27,7 +24,7 @@ const getNextApiKey = (): string => {
 };
 // --- KẾT THÚC HỆ THỐNG KEY ---
 
-// Centralized error handler (Cải thiện để báo lỗi rõ hơn)
+// Centralized error handler
 const handleGeminiError = (error: unknown, context: string): Error => {
     console.error(`Error during ${context}:`, error);
     const errorMessage = String(error).toLowerCase();
@@ -46,16 +43,11 @@ const handleGeminiError = (error: unknown, context: string): Error => {
         return new Error("Lỗi: Key hiện tại đã hết quota. Tool sẽ tự động đổi sang key khác ở lần gọi tiếp theo.");
     }
     
-    // Default messages
     switch (context) {
-        case 'story generation':
-            return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
-        case 'character generation':
-            return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
-        case 'script generation':
-            return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
-        default:
-            return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
+        case 'story generation': return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
+        case 'character generation': return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
+        case 'script generation': return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
+        default: return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
     }
 };
 
@@ -79,7 +71,6 @@ const callWithRetry = async <T>(apiCall: (ai: GoogleGenAI) => Promise<T>, contex
             throw handleGeminiError(error, context);
         }
     }
-    // Ném lỗi cuối cùng nếu tất cả các key đều thất bại
     throw new Error(`Đã thử tất cả ${USER_API_KEYS.length} Key nhưng đều thất bại. Lỗi cuối cùng: ${lastError?.message || lastError}`);
 };
 
@@ -97,7 +88,6 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING },
-              // === ĐÃ SỬA LỖI Ở ĐÂY ===
               summary: { type: Type.STRING }, 
             },
             required: ["title", "summary"],
@@ -138,9 +128,29 @@ export const generateCharacterDetails = async (story: Story, numCharacters: numb
     }, 'character generation');
 };
 
-// (Hàm generateCharacterImage đã bị xóa)
+// NÂNG CẤP HÀM NÀY
+export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string, scriptStyle: string): Promise<Script> => {
+    
+    const isDialogueStyle = scriptStyle === 'Lời thoại';
+    
+    // 1. Tạo hướng dẫn động cho AI
+    const promptInstruction = isDialogueStyle
+        ? `3. Với mỗi cảnh, cung cấp "dialogues": một MẢNG các lời thoại giữa các nhân vật (ví dụ: [{"character": "Tên NV", "line": "Lời thoại..."}]). PHẢI có ít nhất 1 lời thoại.`
+        : `3. Với mỗi cảnh, cung cấp "dialogues": một MẢNG CHỨA 1 LỜI DẪN (ví dụ: [{"character": "Narrator", "line": "Lời dẫn..."}]).`;
 
-export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string): Promise<Script> => {
+    // 2. Tạo Schema (cấu trúc JSON) động
+    const dialoguesSchema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                character: { type: Type.STRING },
+                line: { type: Type.STRING }
+            },
+            required: ["character", "line"]
+        }
+    };
+
     return callWithRetry(async (ai) => {
         const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt}`).join('\n');
         const expectedScenes = Math.ceil(duration / 8);
@@ -150,12 +160,14 @@ export const generateScript = async (story: Story, characters: Character[], dura
             contents: `Viết kịch bản video ${duration} giây.
             - Truyện: "${story.title}" (${story.summary})
             - Nhân vật: ${characterDescriptions}
-            - Ngôn ngữ lời dẫn (narration): ${narrationLanguage}
+            - Ngôn ngữ: ${narrationLanguage}
+            - Kiểu kịch bản: ${scriptStyle}
 
             Yêu cầu (JSON):
-            1. "summary": Tóm tắt kịch bản.
+            1. "summary": Tóm tắt kịch bản (ngôn ngữ ${narrationLanguage}).
             2. "scenes": Mảng gồm ${expectedScenes} cảnh.
-            3. Mỗi cảnh ("scene") phải có: "id", "description" (mô tả cảnh, tiếng Việt), "narration" (lời dẫn), "veo_prompt" (prompt tạo video, tiếng Anh, BẮT BUỘC chứa tên 1 nhân vật), "characters_present" (mảng tên nhân vật có trong cảnh, BẮT BUỘC có ít nhất 1).
+            ${promptInstruction}
+            4. Mỗi cảnh cũng phải có: "id", "description" (mô tả cảnh, tiếng Việt), "veo_prompt" (prompt video, tiếng Anh, BẮT BUỘC chứa tên 1 nhân vật), "characters_present" (mảng tên nhân vật, BẮT BUỘC có ít nhất 1).
             `,
             config: {
                 responseMimeType: "application/json",
@@ -170,11 +182,12 @@ export const generateScript = async (story: Story, characters: Character[], dura
                                 properties: {
                                     id: { type: Type.NUMBER },
                                     description: { type: Type.STRING },
-                                    narration: { type: Type.STRING },
+                                    // SỬA "narration" THÀNH "dialogues"
+                                    dialogues: dialoguesSchema,
                                     veo_prompt: { type: Type.STRING },
                                     characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
                                 },
-                                required: ["id", "description", "narration", "veo_prompt", "characters_present"],
+                                required: ["id", "description", "dialogues", "veo_prompt", "characters_present"],
                             },
                         },
                     },
