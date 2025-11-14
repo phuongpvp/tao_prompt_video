@@ -9,13 +9,16 @@ export const setApiKeys = (keys: string[]) => {
     USER_API_KEYS = keys.map(k => k.trim()).filter(k => k.length > 10);
     currentKeyIndex = 0;
 };
+
 export const clearApiKeys = () => {
     USER_API_KEYS = [];
     currentKeyIndex = 0;
 };
+
 export const hasApiKeys = (): boolean => {
     return USER_API_KEYS.length > 0;
 };
+
 const getNextApiKey = (): string => {
     if (USER_API_KEYS.length === 0) throw new Error("MISSING_KEYS");
     const key = USER_API_KEYS[currentKeyIndex];
@@ -44,10 +47,14 @@ const handleGeminiError = (error: unknown, context: string): Error => {
     }
     
     switch (context) {
-        case 'story generation': return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
-        case 'character generation': return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
-        case 'script generation': return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
-        default: return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
+        case 'story generation':
+            return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
+        case 'character generation':
+            return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
+        case 'script generation':
+            return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
+        default:
+            return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
     }
 };
 
@@ -133,23 +140,24 @@ export const generateScript = async (story: Story, characters: Character[], dura
     
     const isDialogueStyle = scriptStyle === 'Lời thoại';
 
-    // 1. Hướng dẫn cho "dialogues" (Phần này đã đúng)
+    // 1. Hướng dẫn cho AI cách viết "dialogues" (Lời thoại / Lời dẫn)
     const dialoguePromptInstruction = isDialogueStyle
         ? `3. "dialogues": MẢNG các lời thoại giữa các nhân vật (ví dụ: [{"character": "Tên NV", "line": "Lời thoại..."}]). PHẢI có ít nhất 1 lời thoại.`
         : `3. "dialogues": MẢNG CHỨA 1 LỜI DẪN (ví dụ: [{"character": "Narrator", "line": "Lời dẫn..."}]).`;
 
-    // 2. Hướng dẫn cho "veo_prompt" (ĐÃ SỬA THEO YÊU CẦU CỦA BẠN)
+    // 2. Hướng dẫn cho AI cách viết "veo_prompt" (Prompt video)
+    //    SỬA LẠI THEO ĐÚNG YÊU CẦU CỦA BẠN (GIỮ NGUYÊN PROMPT GỐC)
     const veoPromptInstruction = isDialogueStyle
         ? `
-            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống như prompt cho Midjourney/DALL-E). PHẢI chứa tên nhân vật. 
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích, giàu trí tưởng tượng, BẮT BUỘC chứa tên nhân vật (Giống như prompt gốc).
             - QUAN TRỌNG: Nối TOÀN BỘ nội dung "line" (lời thoại) của cảnh đó vào cuối "veo_prompt", đặt trong dấu nháy đơn.
             - CHỈ NỐI NỘI DUNG LỜI THOẠI, KHÔNG thêm "Narrator says:".
-            - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong, 'This city isn't big enough for both of us!'"
+            - Ví dụ: "Vibrant 3D animation style... Thỏ Turbo... Rùa Rừng Rình... 'Nhanh lên nào rùa ơi!'"
         `
         : `
-            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống như prompt cho Midjourney/DALL-E). PHẢI chứa tên nhân vật.
-            - Y hệt như prompt gốc, KHÔNG chèn lời dẫn vào.
-            - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong"
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích, giàu trí tưởng tượng, BẮT BUỘC chứa tên nhân vật.
+            - KHÔNG chèn lời dẫn vào. (Đây là prompt gốc mà bạn thích).
+            - Ví dụ: "Vibrant 3D animation style, at a colorful race starting line... The sleek rabbit Thỏ Turbo... the wise turtle Rùa Rừng Rình..."
         `;
 
     // 3. Cấu trúc JSON (Schema) cho AI tuân theo
@@ -171,6 +179,7 @@ export const generateScript = async (story: Story, characters: Character[], dura
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash", 
+            // SỬA LẠI CONTENTS (PROMPT)
             contents: `Viết kịch bản video ${duration} giây.
             - Truyện: "${story.title}" (${story.summary})
             - Nhân vật: ${characterDescriptions}
@@ -189,6 +198,7 @@ export const generateScript = async (story: Story, characters: Character[], dura
             `,
             config: {
                 responseMimeType: "application/json",
+                // SỬA LẠI SCHEMA
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
@@ -200,12 +210,11 @@ export const generateScript = async (story: Story, characters: Character[], dura
                                 properties: {
                                     id: { type: Type.NUMBER },
                                     description: { type: Type.STRING },
-                                    // Sửa "narration" thành "dialogues" để khớp với App.tsx
-                                    dialogues: dialoguesSchema, 
+                                    dialogues: dialoguesSchema, // Sửa 'narration' thành 'dialogues'
                                     veo_prompt: { type: Type.STRING },
                                     characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
                                 },
-                                required: ["id", "description", "dialogues", "veo_prompt", "characters_present"],
+                                required: ["id", "description", "dialogues", "veo_prompt", "characters_present"], // Sửa 'narration'
                             },
                         },
                     },
