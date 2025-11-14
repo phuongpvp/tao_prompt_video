@@ -10,6 +10,7 @@ export interface Character {
   name: string;
   description: string; // Mô tả tiếng Việt
   prompt: string;      // Prompt tiếng Anh
+  role: string;        // THÊM TRƯỜNG NÀY (ví dụ: "Nhân vật chính")
 }
 
 // Cập nhật Scene để dùng 'dialogues'

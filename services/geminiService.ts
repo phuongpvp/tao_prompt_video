@@ -101,20 +101,16 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
 };
 
 // === NÂNG CẤP HÀM NÀY ===
-export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id'>[]> => {
+export const generateCharacterDetails = async (story: Story, numMain: number, numSide: number, style: string): Promise<Omit<Character, 'id'>[]> => {
     return callWithRetry(async (ai) => {
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash", 
-            contents: `Dựa trên câu chuyện: "${story.title}" (${story.summary}), tạo ra ${numCharacters} nhân vật chính.
+            contents: `Dựa trên câu chuyện: "${story.title}" (${story.summary}), tạo ra ${numMain} NHÂN VẬT CHÍNH và ${numSide} NHÂN VẬT PHỤ.
             Với mỗi nhân vật, cung cấp:
             - "name": Tên nhân vật (Tiếng Việt, ví dụ: "Kael", "Elara").
+            - "role": Vai trò (Ghi chính xác "Nhân vật chính" hoặc "Nhân vật phụ").
             - "description": Mô tả chi tiết nhân vật (tính cách, ngoại hình, vai trò) bằng TIẾNG VIỆT.
             - "prompt": Một câu lệnh (prompt) tạo ảnh chi tiết bằng TIẾNG ANH (theo phong cách ${style}) để dùng cho AI tạo ảnh.
-            
-            Ví dụ:
-            - name: "Kael"
-            - description: "Kael là một chàng trai trẻ..." (Tiếng Việt)
-            - prompt: "A full-body portrait of a young prehistoric man named Kael..." (Tiếng Anh)
             `,
             config: {
                 responseMimeType: "application/json",
@@ -124,10 +120,11 @@ export const generateCharacterDetails = async (story: Story, numCharacters: numb
                         type: Type.OBJECT,
                         properties: {
                             name: { type: Type.STRING },
-                            description: { type: Type.STRING }, // Thêm trường mới
+                            role: { type: Type.STRING }, // Thêm trường mới
+                            description: { type: Type.STRING },
                             prompt: { type: Type.STRING },
                         },
-                         required: ["name", "description", "prompt"], // Yêu cầu cả 3
+                         required: ["name", "role", "description", "prompt"], // Yêu cầu cả 4
                     },
                 },
             },
@@ -170,7 +167,7 @@ export const generateScript = async (story: Story, characters: Character[], dura
     };
 
     return callWithRetry(async (ai) => {
-        const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt} (Tên đầy đủ: "${c.name}")`).join('\n');
+        const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt} (Tên đầy đủ: "${c.name}", Vai trò: "${c.role}")`).join('\n');
         const expectedScenes = Math.ceil(duration / 8);
 
         const response = await ai.models.generateContent({

@@ -32,8 +32,13 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
                     onChange={(e) => onNameChange(character.id, e.target.value)}
                     className="flex-1 bg-transparent text-2xl font-bold text-cyan-400 p-1 -ml-1 focus:outline-none focus:bg-slate-700 rounded"
                 />
-                <span className="bg-yellow-500/20 text-yellow-300 text-xs font-semibold px-3 py-1 rounded-full">
-                    Nhân vật chính
+                {/* === THÊM TAG VAI TRÒ === */}
+                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                    character.role === 'Nhân vật chính' 
+                    ? 'bg-yellow-500/20 text-yellow-300' 
+                    : 'bg-blue-500/20 text-blue-300'
+                }`}>
+                    {character.role}
                 </span>
             </div>
             

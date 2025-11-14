@@ -64,16 +64,14 @@ function App() {
     const [style, setStyle] = useState(VISUAL_STYLES[0]);
     const [narrationLanguage, setNarrationLanguage] = useState(NARRATION_LANGUAGES[0]);
     const [scriptStyle, setScriptStyle] = useState('Lời dẫn'); 
-    
-    // === SỬA Ở ĐÂY ===
-    // Mặc định là 1 và không cần set nữa
-    const [numStories] = useState(1); 
-    
+    const [numStories, setNumStories] = useState(1); // Mặc định là 1
     const [generatedStories, setGeneratedStories] = useState<Story[]>([]);
     
     // Step 2 State
     const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
-    const [numCharacters, setNumCharacters] = useState(2);
+    // === SỬA LẠI STATE NHÂN VẬT ===
+    const [numMainCharacters, setNumMainCharacters] = useState(2);
+    const [numSideCharacters, setNumSideCharacters] = useState(2);
     
     // Step 3 State
     const [characters, setCharacters] = useState<Character[]>([]);
@@ -128,7 +126,6 @@ function App() {
         setIsLoading(true);
         setLoadingMessage('Đang tạo ý tưởng...');
         try {
-            // numStories ở đây đã là 1
             const storiesData = await geminiService.generateStoryIdeas(storyIdea, style, numStories);
             setGeneratedStories(storiesData.map((s, i) => ({ ...s, id: i + 1 })));
         } catch (error) {
@@ -144,12 +141,15 @@ function App() {
         setIsLoading(true);
         setLoadingMessage('Đang tạo mô tả nhân vật...');
         try {
-            const characterDetails = await geminiService.generateCharacterDetails(selectedStory, numCharacters, style);
+            // === SỬA LẠI HÀM GỌI ===
+            const characterDetails = await geminiService.generateCharacterDetails(selectedStory, numMainCharacters, numSideCharacters, style);
+            // === SỬA LẠI MAP DỮ LIỆU ===
             const initialCharacters = characterDetails.map((cd, i) => ({
                 id: i + 1,
                 name: cd.name,
-                description: cd.description, 
+                description: cd.description,
                 prompt: cd.prompt,
+                role: cd.role, // Thêm role
             }));
             setCharacters(initialCharacters);
             setStep(AppStep.CHARACTER_CREATION);
@@ -159,6 +159,7 @@ function App() {
         setIsLoading(false);
     };
 
+    // === SỬA LẠI HÀM NÀY ===
     const handleCharacterChange = (id: number, field: 'name' | 'prompt' | 'description', value: string) => {
         setCharacters(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
     };
@@ -323,12 +324,23 @@ function App() {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex items-center gap-6">
-                                    <div>
-                                        <label htmlFor="num-characters" className="block text-sm font-medium text-slate-300">Số lượng nhân vật chính</label>
-                                        <input type="number" id="num-characters" value={numCharacters} onChange={(e) => setNumCharacters(parseInt(e.target.value, 10))} min="1" max="4" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                                
+                                {/* === SỬA LẠI KHUNG CHỌN NHÂN VẬT === */}
+                                <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex flex-col md:flex-row items-start md:items-end gap-6">
+                                    <div className="flex-grow">
+                                        <label className="block text-sm font-medium text-slate-300 mb-2">Số lượng nhân vật (tùy chọn):</label>
+                                        <div className="flex gap-4">
+                                            <div>
+                                                <label htmlFor="num-main-characters" className="block text-xs font-medium text-slate-400">Nhân vật chính</label>
+                                                <input type="number" id="num-main-characters" value={numMainCharacters} onChange={(e) => setNumMainCharacters(parseInt(e.target.value, 10))} min="1" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="num-side-characters" className="block text-xs font-medium text-slate-400">Nhân vật phụ</label>
+                                                <input type="number" id="num-side-characters" value={numSideCharacters} onChange={(e) => setNumSideCharacters(parseInt(e.target.value, 10))} min="0" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button onClick={handleCreateCharacter} disabled={selectedStoryId === null || isLoading} className="self-end w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-500 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
+                                    <button onClick={handleCreateCharacter} disabled={selectedStoryId === null || isLoading} className="w-full md:w-auto bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-500 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
                                          {isLoading ? 'Đang tạo...' : 'Tiếp tục: Tạo nhân vật'}
                                     </button>
                                 </div>
