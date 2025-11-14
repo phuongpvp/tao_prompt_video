@@ -5,7 +5,7 @@ import { VISUAL_STYLES, NARRATION_LANGUAGES } from './constants';
 import { setApiKeys, hasApiKeys, clearApiKeys } from './services/geminiService';
 import * as geminiService from './services/geminiService';
 import Loader from './components/Loader';
-import CharacterCard from './components/CharacterCard';
+// Đã xóa CharacterCard vì không cần nữa
 
 // --- ICONS (Giữ nguyên) ---
 const BackIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>);
@@ -15,7 +15,7 @@ const KeyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4
 const EditIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>;
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>;
 
-// --- COMPONENT POPUP NHẬP KEY ---
+// --- COMPONENT POPUP NHẬP KEY (Giữ nguyên) ---
 const ApiKeyModal = ({ isOpen, onClose, onSave, savedKeys }: { isOpen: boolean, onClose: () => void, onSave: (keys: string[]) => void, savedKeys: string[] }) => {
     const [inputVal, setInputVal] = useState('');
     useEffect(() => {
@@ -51,31 +51,27 @@ const ApiKeyModal = ({ isOpen, onClose, onSave, savedKeys }: { isOpen: boolean, 
 
 
 function App() {
-    const [step, setStep] = useState<AppStep>(AppStep.STORY_IDEAS);
+    // const [step, setStep] = useState<AppStep>(AppStep.STORY_IDEAS); // Xóa bỏ state
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Đang xử lý...');
 
-    // State cho API Key
+    // State cho API Key (Giữ nguyên)
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
     const [userKeys, setUserKeys] = useState<string[]>([]);
 
-    // Step 1 State
+    // --- STATE CHO FORM MỚI ---
     const [storyIdea, setStoryIdea] = useState('');
     const [style, setStyle] = useState(VISUAL_STYLES[0]);
     const [narrationLanguage, setNarrationLanguage] = useState(NARRATION_LANGUAGES[0]);
-    const [scriptStyle, setScriptStyle] = useState('Lời dẫn'); // 'Lời dẫn' hoặc 'Lời thoại'
-    const [numStories, setNumStories] = useState(3);
-    const [generatedStories, setGeneratedStories] = useState<Story[]>([]);
-    
-    // Step 2 State
-    const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
-    const [numCharacters, setNumCharacters] = useState(2);
-    
-    // Step 3 State
-    const [characters, setCharacters] = useState<Character[]>([]);
+    const [scriptStyle, setScriptStyle] = useState('Lời dẫn');
+    const [numMainCharacters, setNumMainCharacters] = useState(2); // State mới
+    const [numSideCharacters, setNumSideCharacters] = useState(2); // State mới
     const [videoDuration, setVideoDuration] = useState(150);
 
-    // Step 4 State
+    // --- STATE CHO KẾT QUẢ ---
+    // (Lưu lại cả 3 để dùng cho các nút Download)
+    const [story, setStory] = useState<Story | null>(null);
+    const [characters, setCharacters] = useState<Character[]>([]);
     const [script, setScript] = useState<Script | null>(null);
 
     // Logic BYOK (Giữ nguyên)
@@ -112,72 +108,46 @@ function App() {
     const handleApiError = (error: unknown) => {
         const message = (error instanceof Error) ? error.message : "Lỗi không xác định";
         alert(message);
+        setIsLoading(false); // Dừng loading khi có lỗi
         if (message === 'MISSING_KEYS') {
             setIsKeyModalOpen(true);
         }
     };
     // Hết Logic BYOK
 
-    const handleGenerateStories = async () => {
-        if (!hasApiKeys()) { setIsKeyModalOpen(true); return; }
-        setIsLoading(true);
-        setLoadingMessage('Đang tạo ý tưởng...');
-        try {
-            const storiesData = await geminiService.generateStoryIdeas(storyIdea, style, numStories);
-            setGeneratedStories(storiesData.map((s, i) => ({ ...s, id: i + 1 })));
-        } catch (error) {
-            handleApiError(error);
-        }
-        setIsLoading(false);
-    };
+    // --- XÓA BỎ handleGenerateStories, handleCreateCharacter, handleCharacterChange ---
 
-    const handleCreateCharacter = async () => {
-        if (!hasApiKeys()) { setIsKeyModalOpen(true); return; }
-        const selectedStory = generatedStories.find(s => s.id === selectedStoryId);
-        if (!selectedStory) { alert("Vui lòng chọn một câu chuyện"); return; }
-        setIsLoading(true);
-        setLoadingMessage('Đang tạo mô tả nhân vật...');
-        try {
-            const characterDetails = await geminiService.generateCharacterDetails(selectedStory, numCharacters, style);
-            const initialCharacters = characterDetails.map((cd, i) => ({
-                id: i + 1,
-                name: cd.name,
-                prompt: cd.prompt,
-                imageUrl: null,
-                imageMimeType: null,
-                isLoadingImage: false,
-                error: null,
-            }));
-            setCharacters(initialCharacters);
-            setStep(AppStep.CHARACTER_CREATION);
-        } catch (error) {
-            handleApiError(error);
-        }
-        setIsLoading(false);
-    };
-
-    const handleCharacterChange = (id: number, field: 'name' | 'prompt', value: string) => {
-        setCharacters(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
-    };
-
+    // HÀM TẠO KỊCH BẢN MỚI (Hàm duy nhất)
     const handleGenerateScript = async () => {
         if (!hasApiKeys()) { setIsKeyModalOpen(true); return; }
-        const selectedStory = generatedStories.find(s => s.id === selectedStoryId);
-        if (!selectedStory) return;
+        if (!storyIdea.trim()) { alert("Vui lòng nhập ý tưởng video"); return; }
 
         setIsLoading(true);
-        setLoadingMessage('Đang viết kịch bản và kiểm tra...');
+        setLoadingMessage('AI đang phân tích ý tưởng, sáng tạo nhân vật và viết kịch bản...');
         try {
-            const result = await geminiService.generateScript(selectedStory, characters, videoDuration, narrationLanguage, scriptStyle);
-            setScript(result);
-            setStep(AppStep.SCRIPT_DISPLAY);
+            // Gọi hàm service mới
+            const result = await geminiService.generateScript(
+                storyIdea,
+                numMainCharacters,
+                numSideCharacters,
+                style,
+                videoDuration,
+                narrationLanguage,
+                scriptStyle
+            );
+            
+            // Lưu kết quả vào state
+            setStory(result.story);
+            setCharacters(result.characters);
+            setScript(result.script);
+
         } catch (error) {
             handleApiError(error);
         }
         setIsLoading(false);
     };
 
-    // --- CÁC HÀM DOWNLOAD (ĐÃ SỬA LẠI ĐẦY ĐỦ) ---
+    // --- CÁC HÀM DOWNLOAD (Giữ nguyên, giờ nó sẽ đọc từ state) ---
     const downloadPrompts = () => {
         if (!script) return;
         const content = script.scenes.map(scene => scene.veo_prompt.trim()).join('\n');
@@ -215,6 +185,7 @@ function App() {
     };
     
     const createProjectJson = (story: Story, characters: Character[], script: Script, style: string, duration: number, language: string) => {
+        // (Logic hàm này giữ nguyên y hệt file cũ)
         const createId = (name: string) => `char_${name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 15)}`;
         const characterMap = new Map(characters.map(c => [c.name, createId(c.name)]));
         const languageToCodeMap: { [key: string]: string } = {
@@ -235,11 +206,7 @@ function App() {
             scenes: script.scenes.map((scene) => ({
                 type: "scene", inherit: "project", sceneId: `scene_${String(scene.id).padStart(3, '0')}`, sceneNumber: scene.id, sceneTitle: scene.description.slice(0, 70) + '...', durationSec: Math.round(duration / script.scenes.length), setting: { place: "Varies", timeOfDay: "day", locationId: "loc_generic" }, participatingCharacters: scene.characters_present.map(name => characterMap.get(name) || name), prompt: scene.veo_prompt,
                 visual: { lighting: "Natural cold daylight", colorPalette: ["cold_blues", "white_snow", "desaturated_neutrals"], pace: "normal", shots: [{ id: `s${String(scene.id).padStart(3, '0')}`, template: "medium", camera: scene.description.slice(0, 70) + '...', durationHint: 4, seed: Math.floor(Math.random() * 100000), shotPrompt: scene.veo_prompt, }] },
-                audio: { 
-                    dialogues: scene.dialogues.map(d => ({ character: d.character, line: d.line })), 
-                    music: { style: "orchestral", mood: "epic and emotional" }, 
-                    sfx: ["howling winter wind", "footsteps in snow"] 
-                },
+                audio: { dialogues: scene.dialogues.map(d => ({ character: d.character, line: d.line })), music: { style: "orchestral", mood: "epic and emotional" }, sfx: ["howling winter wind", "footsteps in snow"] },
                 meta: { order: scene.id, notes: "Generated from video script generator app.", generatedAt: new Date().toISOString() }
             })),
             export: { container: "mp4", codec: "h264", bitrateTarget: "12Mbps", generatedAt: new Date().toISOString() }
@@ -247,16 +214,14 @@ function App() {
         return project;
     }
     const downloadJson = () => {
-        if (!script || !selectedStoryId) return;
-        const selectedStory = generatedStories.find(s => s.id === selectedStoryId);
-        if (!selectedStory) return;
-        const projectJson = createProjectJson( selectedStory, characters, script, style, videoDuration, narrationLanguage );
+        if (!script || !story) return; // Chỉ cần check script và story
+        const projectJson = createProjectJson( story, characters, script, style, videoDuration, narrationLanguage );
         const content = JSON.stringify(projectJson, null, 2);
         const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${selectedStory.title.replace(/\s+/g, '_')}_project.json`;
+        a.download = `${story.title.replace(/\s+/g, '_')}_project.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -264,182 +229,151 @@ function App() {
     };
 
     const resetApp = () => {
-        setStep(AppStep.STORY_IDEAS);
-        setGeneratedStories([]);
-        setSelectedStoryId(null);
-        setCharacters([]);
+        // Reset form
+        setStoryIdea('');
+        setNumMainCharacters(2);
+        setNumSideCharacters(2);
+        setVideoDuration(150);
+        // Reset kết quả
         setScript(null);
+        setStory(null);
+        setCharacters([]);
     }
     
-    const renderStep = () => {
-        switch (step) {
-            case AppStep.STORY_IDEAS:
-                return (
-                    <div>
-                        <div className="bg-slate-800 p-8 rounded-lg shadow-2xl space-y-6">
-                            <h2 className="text-2xl font-bold text-white mb-2">Bước 1: Tạo ý tưởng câu chuyện</h2>
-                            <div className="space-y-2">
-                                <label htmlFor="story-idea" className="block text-sm font-medium text-slate-300">Nhập thể loại hoặc ý tưởng câu chuyện</label>
-                                <textarea id="story-idea" value={storyIdea} onChange={(e) => setStoryIdea(e.target.value)} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-slate-200 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400" placeholder="Ví dụ: một con quái vật khổng lồ tấn công thành phố, một bộ phim tài liệu về động vật hoang dã..." />
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                <div>
-                                    <label htmlFor="style" className="block text-sm font-medium text-slate-300">Phong cách</label>
-                                    <select id="style" value={style} onChange={(e) => setStyle(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
-                                        {VISUAL_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="narration-language" className="block text-sm font-medium text-slate-300">Ngôn ngữ</label>
-                                    <select id="narration-language" value={narrationLanguage} onChange={(e) => setNarrationLanguage(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
-                                        {NARRATION_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="script-style" className="block text-sm font-medium text-slate-300">Kiểu kịch bản</label>
-                                    <select id="script-style" value={scriptStyle} onChange={(e) => setScriptStyle(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
-                                        <option>Lời dẫn</option>
-                                        <option>Lời thoại</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label htmlFor="num-stories" className="block text-sm font-medium text-slate-300">Số ý tưởng</label>
-                                    <input type="number" id="num-stories" value={numStories} onChange={(e) => setNumStories(parseInt(e.target.value, 10))} min="1" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
-                                </div>
-                            </div>
-                            <button onClick={handleGenerateStories} disabled={!storyIdea || isLoading} className="w-full bg-amber-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
-                                {isLoading ? 'Đang tạo...' : 'Tạo ý tưởng'}
-                            </button>
+    // HÀM RENDER FORM MỚI
+    const renderForm = () => {
+        return (
+            <div>
+                <div className="bg-slate-800 p-8 rounded-lg shadow-2xl space-y-6">
+                    <h2 className="text-2xl font-bold text-white mb-2">Bước 1: Nhập yêu cầu kịch bản</h2>
+                    
+                    {/* Ý TƯỞNG VIDEO */}
+                    <div className="space-y-2">
+                        <label htmlFor="story-idea" className="block text-sm font-medium text-slate-300">Ý tưởng video</label>
+                        <textarea id="story-idea" value={storyIdea} onChange={(e) => setStoryIdea(e.target.value)} rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-slate-200 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400" placeholder="Ví dụ: Một phi hành gia bị lạc trên một hành tinh xa lạ và phải tìm cách sinh tồn..." />
+                    </div>
+                    
+                    {/* CÁC TÙY CHỌN */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        <div>
+                            <label htmlFor="style" className="block text-sm font-medium text-slate-300">Phong cách</label>
+                            <select id="style" value={style} onChange={(e) => setStyle(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+                                {VISUAL_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
                         </div>
+                        <div>
+                            <label htmlFor="narration-language" className="block text-sm font-medium text-slate-300">Ngôn ngữ</label>
+                            <select id="narration-language" value={narrationLanguage} onChange={(e) => setNarrationLanguage(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+                                {NARRATION_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="script-style" className="block text-sm font-medium text-slate-300">Kiểu kịch bản</label>
+                            <select id="script-style" value={scriptStyle} onChange={(e) => setScriptStyle(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
+                                <option>Lời dẫn</option>
+                                <option>Lời thoại</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="video-duration" className="block text-sm font-medium text-slate-300">Thời lượng (giây)</label>
+                            <input type="number" id="video-duration" value={videoDuration} onChange={(e) => setVideoDuration(parseInt(e.target.value, 10))} step="10" min="10" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                        </div>
+                         <div>
+                            <label htmlFor="num-main-characters" className="block text-sm font-medium text-slate-300">Nhân vật chính</label>
+                            <input type="number" id="num-main-characters" value={numMainCharacters} onChange={(e) => setNumMainCharacters(parseInt(e.target.value, 10))} min="1" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                        </div>
+                         <div>
+                            <label htmlFor="num-side-characters" className="block text-sm font-medium text-slate-300">Nhân vật phụ</label>
+                            <input type="number" id="num-side-characters" value={numSideCharacters} onChange={(e) => setNumSideCharacters(parseInt(e.target.value, 10))} min="0" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                        </div>
+                    </div>
 
-                        {/* === KHỐI CODE BỊ THIẾU MÌNH ĐÃ THÊM LẠI ĐẦY ĐỦ === */}
-                        {generatedStories.length > 0 && (
-                            <div className="mt-8">
-                                <h3 className="text-xl font-bold mb-4">Chọn một câu chuyện để tiếp tục:</h3>
-                                <div className="space-y-4">
-                                    {generatedStories.map(story => (
-                                        <div key={story.id} onClick={() => setSelectedStoryId(story.id)} className={`bg-slate-800 p-4 rounded-lg cursor-pointer border-2 transition ${selectedStoryId === story.id ? 'border-amber-500 bg-slate-700' : 'border-transparent hover:border-slate-600'}`}>
-                                            <h4 className="font-bold text-amber-400">{story.title}</h4>
-                                            <p className="text-sm text-slate-300 mt-1">{story.summary}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex items-center gap-6">
+                    {/* NÚT TẠO KỊCH BẢN */}
+                    <button onClick={handleGenerateScript} disabled={!storyIdea || isLoading} className="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-500 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
+                        {isLoading ? 'Đang tạo...' : 'Tạo kịch bản'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+    
+    // HÀM RENDER KẾT QUẢ
+    const renderScriptDisplay = () => {
+        const CopyButton = ({ textToCopy }: { textToCopy: string }) => {
+            const [copied, setCopied] = useState(false);
+            const handleCopy = () => {
+                navigator.clipboard.writeText(textToCopy);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+            return (
+                <button onClick={handleCopy} className="text-slate-400 hover:text-white transition" title="Sao chép">
+                    {copied ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                    )}
+                </button>
+            );
+        };
+
+        return (
+            <div>
+                <h2 className="text-3xl font-bold text-amber-400 mb-2">{story?.title}</h2>
+                <p className="text-slate-300 mb-6 italic">{script?.summary}</p>
+                
+                <div className="flex flex-wrap gap-4 mb-8 p-4 bg-slate-800/80 backdrop-blur-sm rounded-lg sticky top-4 z-10 border border-slate-700">
+                    <button onClick={downloadPrompts} className="bg-amber-500 text-slate-900 font-bold py-2 px-4 rounded-lg hover:bg-amber-400 transition flex items-center"><DownloadIcon /> Tải Prompts</button>
+                    <button onClick={downloadNarration} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-500 transition flex items-center"><DownloadIcon /> Tải lời thoại</button>
+                    <button onClick={downloadJson} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-500 transition flex items-center"><DownloadIcon /> Tải JSON</button>
+                    <button onClick={resetApp} className="ml-auto bg-slate-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition flex items-center"><CreateNewIcon /> Tạo kịch bản mới</button>
+                </div>
+
+                <div className="space-y-6">
+                    {script?.scenes.map(scene => (
+                        <div key={scene.id} className="bg-slate-800 p-6 rounded-lg shadow-lg">
+                            <h3 className="font-bold text-xl text-amber-400 mb-4 border-b border-slate-700 pb-2">Cảnh {scene.id}</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                                <div className="md:col-span-3 space-y-4">
                                     <div>
-                                        <label htmlFor="num-characters" className="block text-sm font-medium text-slate-300">Số lượng nhân vật chính</label>
-                                        <input type="number" id="num-characters" value={numCharacters} onChange={(e) => setNumCharacters(parseInt(e.target.value, 10))} min="1" max="4" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
+                                        <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Mô tả</h4>
+                                        <p className="text-slate-200 mt-1">{scene.description}</p>
                                     </div>
-                                    <button onClick={handleCreateCharacter} disabled={selectedStoryId === null || isLoading} className="self-end w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-500 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
-                                         {isLoading ? 'Đang tạo...' : 'Tiếp tục: Tạo nhân vật'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            case AppStep.CHARACTER_CREATION:
-                 return (
-                    <div>
-                        <h2 className="text-2xl font-bold text-white mb-6">Bước 2: Tinh chỉnh nhân vật</h2>
-                        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${numCharacters > 2 ? numCharacters : 2} gap-6 mb-6`}>
-                           {characters.map(character => (
-                                <CharacterCard 
-                                    key={character.id} 
-                                    character={character} 
-                                    onNameChange={(id, value) => handleCharacterChange(id, 'name', value)}
-                                    onPromptChange={(id, value) => handleCharacterChange(id, 'prompt', value)}
-                                />
-                            ))}
-                        </div>
-                        <div className="bg-slate-800 p-6 rounded-lg shadow-lg flex items-center gap-6">
-                            <div>
-                                <label htmlFor="video-duration" className="block text-sm font-medium text-slate-300">Thời lượng video (giây)</label>
-                                <input type="number" id="video-duration" value={videoDuration} onChange={(e) => setVideoDuration(parseInt(e.target.value, 10))} step="10" min="10" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
-                            </div>
-                            <button onClick={handleGenerateScript} disabled={isLoading} className="self-end w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-500 transition disabled:bg-slate-600">
-                                {isLoading ? 'Đang tạo...' : 'Tiếp tục: Viết kịch bản'}
-                            </button>
-                        </div>
-                        <button onClick={() => setStep(AppStep.STORY_IDEAS)} className="mt-6 flex items-center text-slate-400 hover:text-white transition"><BackIcon /> Quay lại</button>
-                    </div>
-                );
-            case AppStep.SCRIPT_DISPLAY:
-                 const CopyButton = ({ textToCopy }: { textToCopy: string }) => {
-                    const [copied, setCopied] = useState(false);
-                    const handleCopy = () => {
-                        navigator.clipboard.writeText(textToCopy);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                    };
-                    return (
-                        <button onClick={handleCopy} className="text-slate-400 hover:text-white transition" title="Sao chép">
-                            {copied ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
-                            )}
-                        </button>
-                    );
-                };
-
-                return (
-                    <div>
-                        <h2 className="text-3xl font-bold text-amber-400 mb-2">{generatedStories.find(s => s.id === selectedStoryId)?.title}</h2>
-                        <p className="text-slate-300 mb-6 italic">{script?.summary}</p>
-                        
-                        <div className="flex flex-wrap gap-4 mb-8 p-4 bg-slate-800/80 backdrop-blur-sm rounded-lg sticky top-4 z-10 border border-slate-700">
-                            <button onClick={downloadPrompts} className="bg-amber-500 text-slate-900 font-bold py-2 px-4 rounded-lg hover:bg-amber-400 transition flex items-center"><DownloadIcon /> Tải Prompts</button>
-                            <button onClick={downloadNarration} className="bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-500 transition flex items-center"><DownloadIcon /> Tải lời thoại</button>
-                            <button onClick={downloadJson} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-500 transition flex items-center"><DownloadIcon /> Tải JSON</button>
-                            <button onClick={resetApp} className="ml-auto bg-slate-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition flex items-center"><CreateNewIcon /> Tạo kịch bản mới</button>
-                        </div>
-
-                        <div className="space-y-6">
-                            {script?.scenes.map(scene => (
-                                <div key={scene.id} className="bg-slate-800 p-6 rounded-lg shadow-lg">
-                                    <h3 className="font-bold text-xl text-amber-400 mb-4 border-b border-slate-700 pb-2">Cảnh {scene.id}</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                                        <div className="md:col-span-3 space-y-4">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Mô tả</h4>
-                                                <p className="text-slate-200 mt-1">{scene.description}</p>
-                                            </div>
-                                            <div>
-                                                <div className="flex justify-between items-center">
-                                                    <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">
-                                                        {scriptStyle === 'Lời thoại' ? 'Lời thoại' : 'Lời dẫn'}
-                                                    </h4>
-                                                    <CopyButton textToCopy={scene.dialogues.map(d => `${d.character}: ${d.line}`).join('\n')} />
-                                                </div>
-                                                <div className="text-slate-200 mt-2 space-y-2 bg-slate-900/50 p-3 rounded-md border border-slate-700">
-                                                    {scene.dialogues.map((dialogue, index) => (
-                                                        <p key={index} className="text-sm">
-                                                            <strong className="text-amber-400">{dialogue.character}:</strong>
-                                                            <span className="italic ml-2">"{dialogue.line}"</span>
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                    <div>
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">
+                                                {scriptStyle === 'Lời thoại' ? 'Lời thoại' : 'Lời dẫn'}
+                                            </h4>
+                                            <CopyButton textToCopy={scene.dialogues.map(d => `${d.character}: ${d.line}`).join('\n')} />
                                         </div>
-                                        <div className="md:col-span-2 bg-slate-900 p-4 rounded-md">
-                                             <div className="flex justify-between items-center mb-2">
-                                                 <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Prompt Video</h4>
-                                                 <CopyButton textToCopy={scene.veo_prompt} />
-                                             </div>
-                                            <p className="text-sm font-mono text-amber-300 break-words">{scene.veo_prompt}</p>
-                                            <div className="mt-4 border-t border-slate-700 pt-3">
-                                                <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Nhân vật</h4>
-                                                <p className="text-sm text-slate-300 mt-1">{scene.characters_present.join(', ') || 'Không có'}</p>
-                                            </div>
+                                        <div className="text-slate-200 mt-2 space-y-2 bg-slate-900/50 p-3 rounded-md border border-slate-700">
+                                            {scene.dialogues.map((dialogue, index) => (
+                                                <p key={index} className="text-sm">
+                                                    <strong className="text-amber-400">{dialogue.character}:</strong>
+                                                    <span className="italic ml-2">"{dialogue.line}"</span>
+                                                </p>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                <div className="md:col-span-2 bg-slate-900 p-4 rounded-md">
+                                     <div className="flex justify-between items-center mb-2">
+                                         <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Prompt Video</h4>
+                                         <CopyButton textToCopy={scene.veo_prompt} />
+                                     </div>
+                                    <p className="text-sm font-mono text-amber-300 break-words">{scene.veo_prompt}</p>
+                                    <div className="mt-4 border-t border-slate-700 pt-3">
+                                        <h4 className="font-semibold text-slate-400 text-sm uppercase tracking-wider">Nhân vật</h4>
+                                        <p className="text-sm text-slate-300 mt-1">{scene.characters_present.join(', ') || 'Không có'}</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                );
-        }
-    };
+                    ))}
+                </div>
+            </div>
+        );
+    }
     
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-8">
@@ -464,7 +398,8 @@ function App() {
                 </div>
             </header>
             <main>
-                {renderStep()}
+                {/* Logic render mới: Nếu chưa có kịch bản thì hiện Form, có rồi thì hiện Kết quả */}
+                {script ? renderScriptDisplay() : renderForm()}
             </main>
         </div>
     );
