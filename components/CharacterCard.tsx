@@ -5,10 +5,8 @@ interface CharacterCardProps {
   character: Character;
   onNameChange: (id: number, newName: string) => void;
   onPromptChange: (id: number, newPrompt: string) => void;
-  // Đã xóa onGenerateImage và onDownloadImage
 }
 
-// Đã xóa các Icon không cần thiết (Download, Regenerate, Image)
 const CopyIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>);
 
 
@@ -17,14 +15,10 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
     const handleCopy = () => {
         navigator.clipboard.writeText(character.prompt);
     }
-    
-    // Đã xóa hàm renderError()
 
     return (
         <div className="bg-slate-800 p-6 rounded-lg shadow-lg space-y-4 flex flex-col">
             
-            {/* ĐÃ XÓA TOÀN BỘ KHUNG HIỂN THỊ ẢNH VÀ NÚT TẠO ẢNH */}
-
             <div className="flex-grow flex flex-col justify-between">
                 <div>
                     <label htmlFor={`char-name-${character.id}`} className="block text-sm font-medium text-slate-300 mb-1">Tên nhân vật {character.id}</label>
@@ -37,7 +31,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
                     />
                 </div>
                 <div className="mt-4">
-                    <label htmlFor={`char-prompt-${character.id}`} className="block text-sm font-medium text-slate-300 mb-1">Mô tả nhân vật {character.id}</DLabel>
+                    {/* === SỬA LỖI Ở ĐÂY === */}
+                    <label htmlFor={`char-prompt-${character.id}`} className="block text-sm font-medium text-slate-300 mb-1">Mô tả nhân vật {character.id}</label>
                     <div className="relative">
                        <textarea
                             id={`char-prompt-${character.id}`}
