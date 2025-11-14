@@ -70,7 +70,7 @@ function App() {
     // Step 2 State
     const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
     const [numMainCharacters, setNumMainCharacters] = useState(2);
-    const [numSideCharacters, setNumSideCharacters] = useState(0); // Sửa lại mặc định là 0 cho hợp lý
+    const [numSideCharacters, setNumSideCharacters] = useState(0);
     
     // Step 3 State
     const [characters, setCharacters] = useState<Character[]>([]);
@@ -348,10 +348,8 @@ function App() {
                  return (
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-6">Bước 2: Tinh chỉnh nhân vật</h2>
-                        {/* === SỬA LẠI LAYOUT GRID 2 CỘT === */}
                         <div className="bg-slate-800 p-8 rounded-lg shadow-2xl">
                            <h3 className="text-xl font-semibold text-cyan-400 mb-6">Danh sách nhân vật</h3>
-                           {/* Thêm grid-cols-2 */}
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                {characters.map(character => (
                                     <CharacterCard 
