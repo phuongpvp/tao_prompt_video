@@ -51,12 +51,11 @@ const ApiKeyModal = ({ isOpen, onClose, onSave, savedKeys }: { isOpen: boolean, 
 
 
 function App() {
-    // Quay lại logic 3 bước
     const [step, setStep] = useState<AppStep>(AppStep.STORY_IDEAS);
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Đang xử lý...');
 
-    // State cho API Key (Giữ nguyên)
+    // State cho API Key
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
     const [userKeys, setUserKeys] = useState<string[]>([]);
 
@@ -64,8 +63,12 @@ function App() {
     const [storyIdea, setStoryIdea] = useState('');
     const [style, setStyle] = useState(VISUAL_STYLES[0]);
     const [narrationLanguage, setNarrationLanguage] = useState(NARRATION_LANGUAGES[0]);
-    const [scriptStyle, setScriptStyle] = useState('Lời dẫn');
-    const [numStories, setNumStories] = useState(3);
+    const [scriptStyle, setScriptStyle] = useState('Lời dẫn'); 
+    
+    // === SỬA Ở ĐÂY ===
+    // Mặc định là 1 và không cần set nữa
+    const [numStories] = useState(1); 
+    
     const [generatedStories, setGeneratedStories] = useState<Story[]>([]);
     
     // Step 2 State
@@ -113,7 +116,7 @@ function App() {
     const handleApiError = (error: unknown) => {
         const message = (error instanceof Error) ? error.message : "Lỗi không xác định";
         alert(message);
-        setIsLoading(false); // Luôn dừng loading khi có lỗi
+        setIsLoading(false);
         if (message === 'MISSING_KEYS') {
             setIsKeyModalOpen(true);
         }
@@ -125,6 +128,7 @@ function App() {
         setIsLoading(true);
         setLoadingMessage('Đang tạo ý tưởng...');
         try {
+            // numStories ở đây đã là 1
             const storiesData = await geminiService.generateStoryIdeas(storyIdea, style, numStories);
             setGeneratedStories(storiesData.map((s, i) => ({ ...s, id: i + 1 })));
         } catch (error) {
@@ -140,13 +144,11 @@ function App() {
         setIsLoading(true);
         setLoadingMessage('Đang tạo mô tả nhân vật...');
         try {
-            // Gọi hàm service đã nâng cấp
             const characterDetails = await geminiService.generateCharacterDetails(selectedStory, numCharacters, style);
-            // Map dữ liệu mới (có 'description')
             const initialCharacters = characterDetails.map((cd, i) => ({
                 id: i + 1,
                 name: cd.name,
-                description: cd.description, // Thêm trường mới
+                description: cd.description, 
                 prompt: cd.prompt,
             }));
             setCharacters(initialCharacters);
@@ -157,7 +159,6 @@ function App() {
         setIsLoading(false);
     };
 
-    // Cập nhật hàm này để xử lý 3 trường
     const handleCharacterChange = (id: number, field: 'name' | 'prompt' | 'description', value: string) => {
         setCharacters(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
     };
@@ -180,13 +181,87 @@ function App() {
     };
 
     // --- CÁC HÀM DOWNLOAD (Giữ nguyên) ---
-    const downloadPrompts = () => { /* ... (Giữ nguyên code) ... */ };
-    const languageToCode: { [key: string]: string } = { /* ... (Giữ nguyên code) ... */ };
-    const downloadNarration = () => { /* ... (Giữ nguyên code) ... */ };
-    const createProjectJson = (story: Story, characters: Character[], script: Script, style: string, duration: number, language: string) => { /* ... (Giữ nguyên code) ... */ };
-    const downloadJson = () => { /* ... (Giữ nguyên code) ... */ };
-    // (Copy & paste các hàm download từ file cũ của bạn)
+    const downloadPrompts = () => {
+        if (!script) return;
+        const content = script.scenes.map(scene => scene.veo_prompt.trim()).join('\n');
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'prompts.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+    const languageToCode: { [key: string]: string } = {
+        'Tiếng Việt': 'vi', 'English': 'en', 'Français': 'fr', 'Español': 'es', '日本語': 'ja', '한국어': 'ko', '中文': 'zh',
+    };
     
+    const downloadNarration = () => {
+        if (!script) return;
+        const content = script.scenes.map(scene => 
+            `--- Cảnh ${scene.id} ---\n` +
+            scene.dialogues.map(d => `${d.character}: ${d.line}`).join('\n')
+        ).join('\n\n');
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const langCode = languageToCode[narrationLanguage] || 'txt';
+        a.download = `narration_${langCode}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+    
+    const createProjectJson = (story: Story, characters: Character[], script: Script, style: string, duration: number, language: string) => {
+        const createId = (name: string) => `char_${name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 15)}`;
+        const characterMap = new Map(characters.map(c => [c.name, createId(c.name)]));
+        const languageToCodeMap: { [key: string]: string } = {
+            'Tiếng Việt': 'vi-VN', 'English': 'en-US', 'Français': 'fr-FR', 'Español': 'es-ES', '日本語': 'ja-JP', '한국어': 'ko-KR', '中文': 'zh-CN',
+        };
+        const project = {
+            version: "3.0.0", type: "project",
+            projectId: `project_${story.title.toLowerCase().replace(/\s+/g, '_').slice(0, 20)}`,
+            metadata: { title: story.title, genre: "adventure", style: style, mood: ["epic", "emotional"], audience: "Teen+", aspectRatio: "16:9", language: languageToCodeMap[language] || 'en-US', },
+            continuity: { styleFingerprint: "generated_style_v1", globalSeed: Math.floor(Math.random() * 100000), locks: { characterLock: true, lightingLock: true, paletteLock: true, assetLock: true, scaleLock: true }, characterSeeds: Object.fromEntries(characters.map(c => [createId(c.name), Math.floor(Math.random() * 100000)])), },
+            defaults: { lighting: "Natural", colorPalette: ["cold", "desaturated", "warm_firelight_accents"], pace: "normal", seedStrategy: "inherit_per_scene_then_offset_per_shot", styleStrength: 0.9, denoiseStrength: 0.35, negativePrompts: ["flicker", "model drift", "face/hand deformation"], cameraRules: { moveSpeed: "slow_to_medium", noHandheld: true, avoid: ["whip pans", "unmotivated angle flips"] } },
+            characterDescriptions: characters.map(c => ({ id: createId(c.name), name: c.name, physicalAppearance: c.prompt, clothing: "Described in physical appearance prompt.", characterTraits: "Described in physical appearance prompt.", voiceType: "N/A", seed: Math.floor(Math.random() * 100000), })),
+            assets: { props: {}, locations: {} },
+            shotTemplates: { establishing_wide: { lens: "35mm eq.", move: "slow pan or slow dolly-in", durationHint: 4 }, medium: { lens: "50mm eq.", move: "gentle static with micro parallax", durationHint: 4 }, close_up: { lens: "75mm eq.", move: "subtle push-in", durationHint: 3 } },
+            veo3Settings: { resolution: "1080p", fps: 24, motion: "medium", continuityPriority: true, seedRespect: "strict" },
+            globalContext: { logline: story.summary, themes: ["survival", "friendship", "adventure"], visualPalette: { lighting: "Natural", colorPalette: ["cold_blues", "white_snow", "warm_orange_firelight"] } },
+            audioVoSettings: { voiceGender: "male", language: languageToCodeMap[language] || 'en-US', paceBpm: 80, style: "dramatic narration", microphone: "studio condenser cinematic", fx: ["slight reverb 12%", "EQ warm low-mids"], musicDucking: "-10dB during narration", exportFormat: "wav, mono 48kHz" },
+            scenes: script.scenes.map((scene) => ({
+                type: "scene", inherit: "project", sceneId: `scene_${String(scene.id).padStart(3, '0')}`, sceneNumber: scene.id, sceneTitle: scene.description.slice(0, 70) + '...', durationSec: Math.round(duration / script.scenes.length), setting: { place: "Varies", timeOfDay: "day", locationId: "loc_generic" }, participatingCharacters: scene.characters_present.map(name => characterMap.get(name) || name), prompt: scene.veo_prompt,
+                visual: { lighting: "Natural cold daylight", colorPalette: ["cold_blues", "white_snow", "desaturated_neutrals"], pace: "normal", shots: [{ id: `s${String(scene.id).padStart(3, '0')}`, template: "medium", camera: scene.description.slice(0, 70) + '...', durationHint: 4, seed: Math.floor(Math.random() * 100000), shotPrompt: scene.veo_prompt, }] },
+                audio: { dialogues: scene.dialogues.map(d => ({ character: d.character, line: d.line })), music: { style: "orchestral", mood: "epic and emotional" }, sfx: ["howling winter wind", "footsteps in snow"] },
+                meta: { order: scene.id, notes: "Generated from video script generator app.", generatedAt: new Date().toISOString() }
+            })),
+            export: { container: "mp4", codec: "h264", bitrateTarget: "12Mbps", generatedAt: new Date().toISOString() }
+        };
+        return project;
+    }
+    const downloadJson = () => {
+        if (!script || !selectedStoryId) return;
+        const selectedStory = generatedStories.find(s => s.id === selectedStoryId);
+        if (!selectedStory) return;
+        const projectJson = createProjectJson( selectedStory, characters, script, style, videoDuration, narrationLanguage );
+        const content = JSON.stringify(projectJson, null, 2);
+        const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${selectedStory.title.replace(/\s+/g, '_')}_project.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const resetApp = () => {
         setStep(AppStep.STORY_IDEAS);
         setGeneratedStories([]);
@@ -207,7 +282,9 @@ function App() {
                                 <label htmlFor="story-idea" className="block text-sm font-medium text-slate-300">Nhập thể loại hoặc ý tưởng câu chuyện</label>
                                 <textarea id="story-idea" value={storyIdea} onChange={(e) => setStoryIdea(e.target.value)} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-slate-200 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400" placeholder="Ví dụ: một con quái vật khổng lồ tấn công thành phố, một bộ phim tài liệu về động vật hoang dã..." />
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            
+                            {/* === SỬA LẠI LAYOUT GRID === */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <label htmlFor="style" className="block text-sm font-medium text-slate-300">Phong cách</label>
                                     <select id="style" value={style} onChange={(e) => setStyle(e.target.value)} className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500">
@@ -227,10 +304,8 @@ function App() {
                                         <option>Lời thoại</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label htmlFor="num-stories" className="block text-sm font-medium text-slate-300">Số ý tưởng</label>
-                                    <input type="number" id="num-stories" value={numStories} onChange={(e) => setNumStories(parseInt(e.target.value, 10))} min="1" max="5" className="mt-1 block w-full bg-slate-700 border border-slate-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-amber-500 focus:border-amber-500" />
-                                </div>
+                                
+                                {/* === ĐÃ XÓA Ô "SỐ Ý TƯỞNG" === */}
                             </div>
                             <button onClick={handleGenerateStories} disabled={!storyIdea || isLoading} className="w-full bg-amber-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
                                 {isLoading ? 'Đang tạo...' : 'Tạo ý tưởng'}
@@ -265,7 +340,6 @@ function App() {
                  return (
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-6">Bước 2: Tinh chỉnh nhân vật</h2>
-                        {/* Wrapper mới cho danh sách nhân vật, giống ảnh của bạn */}
                         <div className="bg-slate-800 p-8 rounded-lg shadow-2xl space-y-8">
                            <h3 className="text-xl font-semibold text-cyan-400">Danh sách nhân vật</h3>
                            {characters.map(character => (
@@ -273,14 +347,12 @@ function App() {
                                     key={character.id} 
                                     character={character} 
                                     onNameChange={(id, value) => handleCharacterChange(id, 'name', value)}
-                                    // Thêm onDescriptionChange
                                     onDescriptionChange={(id, value) => handleCharacterChange(id, 'description', value)}
                                     onPromptChange={(id, value) => handleCharacterChange(id, 'prompt', value)}
                                 />
                             ))}
                         </div>
                         
-                        {/* Khung thời lượng */}
                         <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex items-center gap-6">
                             <div>
                                 <label htmlFor="video-duration" className="block text-sm font-medium text-slate-300">Thời lượng video (giây)</label>
@@ -294,7 +366,24 @@ function App() {
                     </div>
                 );
             case AppStep.SCRIPT_DISPLAY:
-                 const CopyButton = ({ textToCopy }: { textToCopy: string }) => { /* ... (Giữ nguyên code) ... */ };
+                 const CopyButton = ({ textToCopy }: { textToCopy: string }) => {
+                    const [copied, setCopied] = useState(false);
+                    const handleCopy = () => {
+                        navigator.clipboard.writeText(textToCopy);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                    };
+                    return (
+                        <button onClick={handleCopy} className="text-slate-400 hover:text-white transition" title="Sao chép">
+                            {copied ? (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                            )}
+                        </button>
+                    );
+                };
+
                 return (
                     <div>
                         <h2 className="text-3xl font-bold text-amber-400 mb-2">{generatedStories.find(s => s.id === selectedStoryId)?.title}</h2>
