@@ -97,7 +97,8 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING },
-              summary: { type: TypeVui lòng thử lại. },
+              // === ĐÃ SỬA LỖI Ở ĐÂY ===
+              summary: { type: Type.STRING }, 
             },
             required: ["title", "summary"],
           },
@@ -112,7 +113,6 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
 export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id' | 'imageUrl' | 'imageMimeType' | 'isLoadingImage' | 'error'>[]> => {
     return callWithRetry(async (ai) => {
         const response = await ai.models.generateContent({
-            // SỬA LỖI Ở ĐÂY: Đổi sang 2.0-flash
             model: "gemini-2.0-flash", 
             contents: `Dựa trên câu chuyện: "${story.title}" (${story.summary}), tạo ra ${numCharacters} nhân vật chính.
             Với mỗi nhân vật, cung cấp:
@@ -146,7 +146,6 @@ export const generateScript = async (story: Story, characters: Character[], dura
         const expectedScenes = Math.ceil(duration / 8);
 
         const response = await ai.models.generateContent({
-            // SỬA LỖI Ở ĐÂY: Đổi sang 2.0-flash
             model: "gemini-2.0-flash", 
             contents: `Viết kịch bản video ${duration} giây.
             - Truyện: "${story.title}" (${story.summary})
