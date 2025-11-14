@@ -4,20 +4,22 @@ export interface Story {
   summary: string;
 }
 
+// Cập nhật kiểu Character
 export interface Character {
   id: number;
   name: string;
-  prompt: string;
-  imageUrl: string | null;
-  imageMimeType: string | null;
-  isLoadingImage: boolean;
-  error: string | null;
+  description: string; // Mô tả tiếng Việt
+  prompt: string;      // Prompt tiếng Anh
 }
 
+// Cập nhật Scene để dùng 'dialogues'
 export interface Scene {
   id: number;
   description: string;
-  narration: string;
+  dialogues: {
+    character: string;
+    line: string;
+  }[];
   veo_prompt: string;
   characters_present: string[];
 }

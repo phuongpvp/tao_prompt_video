@@ -74,18 +74,71 @@ const callWithRetry = async <T>(apiCall: (ai: GoogleGenAI) => Promise<T>, contex
     throw new Error(`Đã thử tất cả ${USER_API_KEYS.length} Key nhưng đều thất bại. Lỗi cuối cùng: ${lastError?.message || lastError}`);
 };
 
-// --- XÓA BỎ `generateStoryIdeas` và `generateCharacterDetails` ---
 
-// --- HÀM TẠO KỊCH BẢN MỚI (ALL-IN-ONE) ---
-export const generateScript = async (
-    storyIdea: string, 
-    numMain: number, 
-    numSide: number,
-    style: string,
-    duration: number, 
-    narrationLanguage: string, 
-    scriptStyle: string
-): Promise<{script: Script, story: Story, characters: Character[]}> => { // Trả về object lớn
+export const generateStoryIdeas = async (idea: string, style: string, count: number): Promise<Omit<Story, 'id'>[]> => {
+  return callWithRetry(async (ai) => {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash", 
+      contents: `Tạo ${count} ý tưởng câu chuyện bằng TIẾNG VIỆT, dựa trên: "${idea}" (phong cách "${style}"). Output: "title" (tên) và "summary" (tóm tắt).`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              summary: { type: Type.STRING }, 
+            },
+            required: ["title", "summary"],
+          },
+        },
+      },
+    });
+    const jsonString = response.text.trim();
+    return JSON.parse(jsonString);
+  }, 'story generation');
+};
+
+// === NÂNG CẤP HÀM NÀY ===
+export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id'>[]> => {
+    return callWithRetry(async (ai) => {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash", 
+            contents: `Dựa trên câu chuyện: "${story.title}" (${story.summary}), tạo ra ${numCharacters} nhân vật chính.
+            Với mỗi nhân vật, cung cấp:
+            - "name": Tên nhân vật (Tiếng Việt, ví dụ: "Kael", "Elara").
+            - "description": Mô tả chi tiết nhân vật (tính cách, ngoại hình, vai trò) bằng TIẾNG VIỆT.
+            - "prompt": Một câu lệnh (prompt) tạo ảnh chi tiết bằng TIẾNG ANH (theo phong cách ${style}) để dùng cho AI tạo ảnh.
+            
+            Ví dụ:
+            - name: "Kael"
+            - description: "Kael là một chàng trai trẻ..." (Tiếng Việt)
+            - prompt: "A full-body portrait of a young prehistoric man named Kael..." (Tiếng Anh)
+            `,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            description: { type: Type.STRING }, // Thêm trường mới
+                            prompt: { type: Type.STRING },
+                        },
+                         required: ["name", "description", "prompt"], // Yêu cầu cả 3
+                    },
+                },
+            },
+        });
+        const jsonString = response.text.trim();
+        return JSON.parse(jsonString);
+    }, 'character generation');
+};
+
+// === HÀM NÀY GIỮ NGUYÊN TỪ LẦN TRƯỚC ===
+export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string, scriptStyle: string): Promise<Script> => {
     
     const isDialogueStyle = scriptStyle === 'Lời thoại';
     
@@ -95,12 +148,12 @@ export const generateScript = async (
 
     const veoPromptInstruction = isDialogueStyle
         ? `
-            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích, BẮT BUỘC chứa tên nhân vật ĐẦY ĐỦ.
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống prompt gốc).
             - QUAN TRỌNG: Nối TOÀN BỘ nội dung "line" (lời thoại) của cảnh đó vào cuối "veo_prompt", đặt trong dấu nháy đơn.
-            - CHỈ NỐI NỘI DUNG LỜI THOẠI.
+            - CHỈ NỐI NỘI DUNG LỜI THOẠI, KHÔNG thêm "Narrator says:".
         `
         : `
-            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích, BẮT BUỘC chứa tên nhân vật ĐẦY ĐỦ.
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống prompt gốc).
             - KHÔNG chèn lời dẫn vào.
         `;
 
@@ -116,106 +169,60 @@ export const generateScript = async (
         }
     };
 
-    // Đây là Cấu trúc JSON lớn mà AI phải trả về
-    const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-            // Phần 1: Thông tin truyện
-            story: {
-                type: Type.OBJECT,
-                properties: {
-                    title: { type: Type.STRING },
-                    summary: { type: Type.STRING }
-                },
-                required: ["title", "summary"]
-            },
-            // Phần 2: Danh sách nhân vật
-            characters: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        name: { type: Type.STRING },
-                        prompt: { type: Type.STRING }
-                    },
-                    required: ["name", "prompt"]
-                }
-            },
-            // Phần 3: Kịch bản
-            script: {
-                type: Type.OBJECT,
-                properties: {
-                    summary: { type: Type.STRING },
-                    scenes: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                id: { type: Type.NUMBER },
-                                description: { type: Type.STRING },
-                                dialogues: dialoguesSchema,
-                                veo_prompt: { type: Type.STRING },
-                                characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            },
-                            required: ["id", "description", "dialogues", "veo_prompt", "characters_present"],
-                        },
-                    },
-                },
-                required: ["summary", "scenes"]
-            }
-        },
-        required: ["story", "characters", "script"]
-    };
-
-
     return callWithRetry(async (ai) => {
+        const characterDescriptions = characters.map(c => `- ${c.name}: ${c.prompt} (Tên đầy đủ: "${c.name}")`).join('\n');
         const expectedScenes = Math.ceil(duration / 8);
 
         const response = await ai.models.generateContent({
             model: "gemini-2.0-flash", 
-            contents: `Bạn là một nhà biên kịch AI. Hãy thực hiện 3 nhiệm vụ sau dựa trên yêu cầu của người dùng:
-            
-            YÊU CẦU ĐẦU VÀO:
-            - Ý tưởng gốc: "${storyIdea}"
-            - Phong cách: "${style}"
+            contents: `Viết kịch bản video ${duration} giây.
+            - Truyện: "${story.title}" (${story.summary})
             - Ngôn ngữ: ${narrationLanguage}
             - Kiểu kịch bản: ${scriptStyle}
-            - Thời lượng: ${duration} giây
-            - Số nhân vật chính: ${numMain}
-            - Số nhân vật phụ: ${numSide}
+            - Danh sách nhân vật (BẮT BUỘC DÙNG TÊN NÀY):
+            ${characterDescriptions}
 
-            NHIỆM VỤ (TRẢ VỀ 1 JSON DUY NHẤT):
-
-            1. TẠO TRUYỆN ("story"):
-               - "title": Tên câu chuyện (Tiếng Việt).
-               - "summary": Tóm tắt câu chuyện (ngôn ngữ ${narrationLanguage}).
-
-            2. TẠO NHÂN VẬT ("characters"):
-               - Tạo ${numMain} nhân vật chính VÀ ${numSide} nhân vật phụ.
-               - Với mỗi nhân vật, cung cấp:
-                 - "name": Tên nhân vật (Tiếng Việt, phải thật đầy đủ, ví dụ "Rùa Rừng Rình" thay vì "Rùa").
-                 - "prompt": Mô tả chi tiết ngoại hình, tính cách (Tiếng Anh) theo phong cách ${style}.
-
-            3. VIẾT KỊCH BẢN ("script"):
-               - "summary": Tóm tắt kịch bản (ngôn ngữ ${narrationLanguage}).
-               - "scenes": Mảng gồm ${expectedScenes} cảnh.
-               ${dialoguePromptInstruction}
-               - Mỗi cảnh cũng phải có:
-                 - "id": Số thứ tự.
-                 - "description": Mô tả cảnh (Tiếng Việt).
-                 - "characters_present": Mảng tên nhân vật có trong cảnh (PHẢI DÙNG TÊN ĐẦY ĐỦ bạn vừa tạo ở NHIỆM VỤ 2).
-                 ${veoPromptInstruction}
+            Yêu cầu (JSON):
+            1. "summary": Tóm tắt kịch bản (ngôn ngữ ${narrationLanguage}).
+            2. "scenes": Mảng gồm ${expectedScenes} cảnh.
+            ${dialoguePromptInstruction}
+            4. Mỗi cảnh cũng phải có:
+                - "id": Số thứ tự.
+                - "description": Mô tả cảnh (Tiếng Việt).
+                - "characters_present": Mảng tên nhân vật có trong cảnh.
+                ${veoPromptInstruction}
             
             QUY TẮC TỐI THƯỢNG: 
-            Tất cả tên nhân vật trong "dialogues", "characters_present" và "veo_prompt" BẮT BUỘC phải khớp 100% với tên nhân vật đầy đủ bạn đã tạo ở NHIỆM VỤ 2.
+            Khi viết "veo_prompt", BẮT BUỘC phải sử dụng TÊN NHÂN VẬT ĐẦY ĐỦ (ví dụ: "Rùa Turbo", "Thỏ Zoom")
+            thay vì tên ngắn (ví dụ: "Turbo", "Zoom"). Đây là yêu cầu bắt buộc để đồng bộ video.
             `,
             config: {
                 responseMimeType: "application/json",
-                responseSchema: responseSchema,
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        summary: { type: Type.STRING },
+                        scenes: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    id: { type: Type.NUMBER },
+                                    description: { type: Type.STRING },
+                                    dialogues: dialoguesSchema,
+                                    veo_prompt: { type: Type.STRING },
+                                    characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                },
+                                required: ["id", "description", "dialogues", "veo_prompt", "characters_present"],
+                            },
+                        },
+                    },
+                    required: ["summary", "scenes"],
+                },
             },
         });
 
         const jsonString = response.text.trim();
-        return JSON.parse(jsonString); // Trả về object lớn { story, characters, script }
+        return JSON.parse(jsonString);
     }, 'script generation');
 };
