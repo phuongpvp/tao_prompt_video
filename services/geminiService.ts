@@ -27,17 +27,17 @@ const getNextApiKey = (): string => {
 };
 // --- KẾT THÚC HỆ THỐNG KEY ---
 
-// Centralized error handler
+// Centralized error handler (Cải thiện để báo lỗi rõ hơn)
 const handleGeminiError = (error: unknown, context: string): Error => {
     console.error(`Error during ${context}:`, error);
     const errorMessage = String(error).toLowerCase();
+    const originalError = (error instanceof Error) ? error.message : errorMessage;
 
-    // Lỗi này quan trọng nhất cho BYOK
     if (errorMessage.includes('api key not valid') || errorMessage.includes('permission denied')) {
-        return new Error("API Key không hợp lệ hoặc đã bị khóa. Vui lòng kiểm tra lại.");
+        return new Error(`Lỗi: API Key không hợp lệ hoặc đã bị khóa. (Chi tiết: ${originalError})`);
     }
     if (errorMessage.includes('billing') || errorMessage.includes('403')) {
-        return new Error('Lỗi: API Key của bạn (Free) không có quyền dùng model này hoặc cần bật thanh toán (Billing).');
+        return new Error(`Lỗi: Key của bạn không có quyền dùng model này hoặc cần bật thanh toán (Billing). (Chi tiết: ${originalError})`);
     }
     if (errorMessage.includes('overloaded') || errorMessage.includes('unavailable')) {
         return new Error("Lỗi: Model AI hiện đang quá tải. Vui lòng thử lại.");
@@ -46,16 +46,16 @@ const handleGeminiError = (error: unknown, context: string): Error => {
         return new Error("Lỗi: Key hiện tại đã hết quota. Tool sẽ tự động đổi sang key khác ở lần gọi tiếp theo.");
     }
     
-    // Default messages based on context
+    // Default messages
     switch (context) {
         case 'story generation':
-            return new Error("Không thể tạo ý tưởng câu chuyện.");
+            return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
         case 'character generation':
-            return new Error("Không thể tạo chi tiết nhân vật.");
+            return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
         case 'script generation':
-            return new Error("Không thể tạo kịch bản.");
+            return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
         default:
-            return new Error("Đã xảy ra lỗi không xác định.");
+            return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
     }
 };
 
@@ -64,7 +64,6 @@ const callWithRetry = async <T>(apiCall: (ai: GoogleGenAI) => Promise<T>, contex
     if (USER_API_KEYS.length === 0) throw new Error("MISSING_KEYS");
     
     let lastError: any;
-    // Thử qua tất cả các key nếu gặp lỗi quota
     for (let i = 0; i < USER_API_KEYS.length; i++) {
         try {
             const apiKey = getNextApiKey();
@@ -73,24 +72,22 @@ const callWithRetry = async <T>(apiCall: (ai: GoogleGenAI) => Promise<T>, contex
         } catch (error: any) {
             lastError = error;
             const errMsg = String(error).toLowerCase();
-            
-            // Nếu lỗi do Quota/Quá tải, tự động thử key tiếp
             if (errMsg.includes('resource_exhausted') || errMsg.includes('quota') || errMsg.includes('overloaded') || errMsg.includes('429')) {
                 console.warn(`[Auto-Retry] Key ...${USER_API_KEYS[currentKeyIndex]?.slice(-4)} bị lỗi quota, đang đổi key...`);
                 continue; 
             }
-            // Lỗi khác (Key sai, Billing,...) thì văng ra luôn
             throw handleGeminiError(error, context);
         }
     }
-    throw new Error(`Thất bại sau khi thử tất cả ${USER_API_KEYS.length} Key. Lỗi cuối: ${lastError?.message || lastError}`);
+    // Ném lỗi cuối cùng nếu tất cả các key đều thất bại
+    throw new Error(`Đã thử tất cả ${USER_API_KEYS.length} Key nhưng đều thất bại. Lỗi cuối cùng: ${lastError?.message || lastError}`);
 };
 
 
 export const generateStoryIdeas = async (idea: string, style: string, count: number): Promise<Omit<Story, 'id'>[]> => {
   return callWithRetry(async (ai) => {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash", // Đổi sang model 2.0 Flash
+      model: "gemini-2.0-flash", 
       contents: `Tạo ${count} ý tưởng câu chuyện bằng TIẾNG VIỆT, dựa trên: "${idea}" (phong cách "${style}"). Output: "title" (tên) và "summary" (tóm tắt).`,
       config: {
         responseMimeType: "application/json",
@@ -100,7 +97,7 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
             type: Type.OBJECT,
             properties: {
               title: { type: Type.STRING },
-              summary: { type: Type.STRING },
+              summary: { type: TypeVui lòng thử lại. },
             },
             required: ["title", "summary"],
           },
@@ -115,7 +112,8 @@ export const generateStoryIdeas = async (idea: string, style: string, count: num
 export const generateCharacterDetails = async (story: Story, numCharacters: number, style: string): Promise<Omit<Character, 'id' | 'imageUrl' | 'imageMimeType' | 'isLoadingImage' | 'error'>[]> => {
     return callWithRetry(async (ai) => {
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-pro-latest", // Đổi sang 1.5 Pro
+            // SỬA LỖI Ở ĐÂY: Đổi sang 2.0-flash
+            model: "gemini-2.0-flash", 
             contents: `Dựa trên câu chuyện: "${story.title}" (${story.summary}), tạo ra ${numCharacters} nhân vật chính.
             Với mỗi nhân vật, cung cấp:
             - "name": Tên nhân vật (Tiếng Việt)
@@ -140,7 +138,7 @@ export const generateCharacterDetails = async (story: Story, numCharacters: numb
     }, 'character generation');
 };
 
-// ĐÃ XÓA HÀM generateCharacterImage() THEO YÊU CẦU
+// (Hàm generateCharacterImage đã bị xóa)
 
 export const generateScript = async (story: Story, characters: Character[], duration: number, narrationLanguage: string): Promise<Script> => {
     return callWithRetry(async (ai) => {
@@ -148,7 +146,8 @@ export const generateScript = async (story: Story, characters: Character[], dura
         const expectedScenes = Math.ceil(duration / 8);
 
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-pro-latest", // Đổi sang 1.5 Pro
+            // SỬA LỖI Ở ĐÂY: Đổi sang 2.0-flash
+            model: "gemini-2.0-flash", 
             contents: `Viết kịch bản video ${duration} giây.
             - Truyện: "${story.title}" (${story.summary})
             - Nhân vật: ${characterDescriptions}
