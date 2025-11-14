@@ -133,12 +133,25 @@ export const generateScript = async (story: Story, characters: Character[], dura
     
     const isDialogueStyle = scriptStyle === 'Lời thoại';
     
-    // 1. Tạo hướng dẫn động cho AI
+    // 1. Hướng dẫn cho "dialogues" (Phần này đã đúng)
     const promptInstruction = isDialogueStyle
-        ? `3. Với mỗi cảnh, cung cấp "dialogues": một MẢNG các lời thoại giữa các nhân vật (ví dụ: [{"character": "Tên NV", "line": "Lời thoại..."}]). PHẢI có ít nhất 1 lời thoại.`
-        : `3. Với mỗi cảnh, cung cấp "dialogues": một MẢNG CHỨA 1 LỜI DẪN (ví dụ: [{"character": "Narrator", "line": "Lời dẫn..."}]).`;
+        ? `3. "dialogues": MẢNG các lời thoại giữa các nhân vật (ví dụ: [{"character": "Tên NV", "line": "Lời thoại..."}]). PHẢI có ít nhất 1 lời thoại.`
+        : `3. "dialogues": MẢNG CHỨA 1 LỜI DẪN (ví dụ: [{"character": "Narrator", "line": "Lời dẫn..."}]).`;
 
-    // 2. Tạo Schema (cấu trúc JSON) động
+    // 2. Hướng dẫn cho "veo_prompt" (ĐÃ SỬA THEO YÊU CẦU CỦA BẠN)
+    const veoPromptInstruction = isDialogueStyle
+        ? `
+            - "veo_prompt": (TIẾNG ANH) Mô tả cảnh + tên nhân vật. 
+            - QUAN TRỌNG: Nối TOÀN BỘ nội dung "line" (lời thoại) của cảnh đó vào cuối prompt, đặt trong dấu nháy đơn.
+            - CHỈ NỐI NỘI DUNG LỜI THOẠI, KHÔNG thêm "Narrator says:" hay "Tên nhân vật says:".
+            - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong, 'This city isn't big enough for both of us!'"
+        `
+        : `
+            - "veo_prompt": (TIẾNG ANH) Mô tả cảnh + tên nhân vật.
+            - QUAN TRỌNG: KHÔNG chèn lời dẫn vào prompt này. Chỉ mô tả hình ảnh.
+            - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong"
+        `;
+
     const dialoguesSchema = {
         type: Type.ARRAY,
         items: {
@@ -167,7 +180,11 @@ export const generateScript = async (story: Story, characters: Character[], dura
             1. "summary": Tóm tắt kịch bản (ngôn ngữ ${narrationLanguage}).
             2. "scenes": Mảng gồm ${expectedScenes} cảnh.
             ${promptInstruction}
-            4. Mỗi cảnh cũng phải có: "id", "description" (mô tả cảnh, tiếng Việt), "veo_prompt" (prompt video, tiếng Anh, BẮT BUỘC chứa tên 1 nhân vật), "characters_present" (mảng tên nhân vật, BẮT BUỘC có ít nhất 1).
+            4. Mỗi cảnh cũng phải có:
+                - "id": Số thứ tự.
+                - "description": Mô tả cảnh (Tiếng Việt).
+                - "characters_present": Mảng tên nhân vật có trong cảnh (BẮT BUỘC có ít nhất 1).
+                ${veoPromptInstruction}
             `,
             config: {
                 responseMimeType: "application/json",
@@ -182,7 +199,6 @@ export const generateScript = async (story: Story, characters: Character[], dura
                                 properties: {
                                     id: { type: Type.NUMBER },
                                     description: { type: Type.STRING },
-                                    // SỬA "narration" THÀNH "dialogues"
                                     dialogues: dialoguesSchema,
                                     veo_prompt: { type: Type.STRING },
                                     characters_present: { type: Type.ARRAY, items: { type: Type.STRING } },
