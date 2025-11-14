@@ -64,14 +64,13 @@ function App() {
     const [style, setStyle] = useState(VISUAL_STYLES[0]);
     const [narrationLanguage, setNarrationLanguage] = useState(NARRATION_LANGUAGES[0]);
     const [scriptStyle, setScriptStyle] = useState('Lời dẫn'); 
-    const [numStories, setNumStories] = useState(1); // Mặc định là 1
+    const [numStories] = useState(1); 
     const [generatedStories, setGeneratedStories] = useState<Story[]>([]);
     
     // Step 2 State
     const [selectedStoryId, setSelectedStoryId] = useState<number | null>(null);
-    // === SỬA LẠI STATE NHÂN VẬT ===
     const [numMainCharacters, setNumMainCharacters] = useState(2);
-    const [numSideCharacters, setNumSideCharacters] = useState(2);
+    const [numSideCharacters, setNumSideCharacters] = useState(0); // Sửa lại mặc định là 0 cho hợp lý
     
     // Step 3 State
     const [characters, setCharacters] = useState<Character[]>([]);
@@ -141,16 +140,18 @@ function App() {
         setIsLoading(true);
         setLoadingMessage('Đang tạo mô tả nhân vật...');
         try {
-            // === SỬA LẠI HÀM GỌI ===
             const characterDetails = await geminiService.generateCharacterDetails(selectedStory, numMainCharacters, numSideCharacters, style);
-            // === SỬA LẠI MAP DỮ LIỆU ===
+            
+            // === SỬA Ở ĐÂY: Tự động chèn "Solid white background." ===
             const initialCharacters = characterDetails.map((cd, i) => ({
                 id: i + 1,
                 name: cd.name,
                 description: cd.description,
-                prompt: cd.prompt,
-                role: cd.role, // Thêm role
+                // Thêm "Solid white background." vào cuối prompt
+                prompt: `${cd.prompt.trim()}. Solid white background.`, 
+                role: cd.role,
             }));
+            
             setCharacters(initialCharacters);
             setStep(AppStep.CHARACTER_CREATION);
         } catch (error) {
@@ -159,7 +160,6 @@ function App() {
         setIsLoading(false);
     };
 
-    // === SỬA LẠI HÀM NÀY ===
     const handleCharacterChange = (id: number, field: 'name' | 'prompt' | 'description', value: string) => {
         setCharacters(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
     };
@@ -284,7 +284,6 @@ function App() {
                                 <textarea id="story-idea" value={storyIdea} onChange={(e) => setStoryIdea(e.target.value)} rows={2} className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-slate-200 focus:ring-amber-500 focus:border-amber-500 placeholder-slate-400" placeholder="Ví dụ: một con quái vật khổng lồ tấn công thành phố, một bộ phim tài liệu về động vật hoang dã..." />
                             </div>
                             
-                            {/* === SỬA LẠI LAYOUT GRID === */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <label htmlFor="style" className="block text-sm font-medium text-slate-300">Phong cách</label>
@@ -305,8 +304,6 @@ function App() {
                                         <option>Lời thoại</option>
                                     </select>
                                 </div>
-                                
-                                {/* === ĐÃ XÓA Ô "SỐ Ý TƯỞNG" === */}
                             </div>
                             <button onClick={handleGenerateStories} disabled={!storyIdea || isLoading} className="w-full bg-amber-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition">
                                 {isLoading ? 'Đang tạo...' : 'Tạo ý tưởng'}
@@ -325,7 +322,6 @@ function App() {
                                     ))}
                                 </div>
                                 
-                                {/* === SỬA LẠI KHUNG CHỌN NHÂN VẬT === */}
                                 <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex flex-col md:flex-row items-start md:items-end gap-6">
                                     <div className="flex-grow">
                                         <label className="block text-sm font-medium text-slate-300 mb-2">Số lượng nhân vật (tùy chọn):</label>
@@ -352,17 +348,21 @@ function App() {
                  return (
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-6">Bước 2: Tinh chỉnh nhân vật</h2>
-                        <div className="bg-slate-800 p-8 rounded-lg shadow-2xl space-y-8">
-                           <h3 className="text-xl font-semibold text-cyan-400">Danh sách nhân vật</h3>
-                           {characters.map(character => (
-                                <CharacterCard 
-                                    key={character.id} 
-                                    character={character} 
-                                    onNameChange={(id, value) => handleCharacterChange(id, 'name', value)}
-                                    onDescriptionChange={(id, value) => handleCharacterChange(id, 'description', value)}
-                                    onPromptChange={(id, value) => handleCharacterChange(id, 'prompt', value)}
-                                />
-                            ))}
+                        {/* === SỬA LẠI LAYOUT GRID 2 CỘT === */}
+                        <div className="bg-slate-800 p-8 rounded-lg shadow-2xl">
+                           <h3 className="text-xl font-semibold text-cyan-400 mb-6">Danh sách nhân vật</h3>
+                           {/* Thêm grid-cols-2 */}
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                               {characters.map(character => (
+                                    <CharacterCard 
+                                        key={character.id} 
+                                        character={character} 
+                                        onNameChange={(id, value) => handleCharacterChange(id, 'name', value)}
+                                        onDescriptionChange={(id, value) => handleCharacterChange(id, 'description', value)}
+                                        onPromptChange={(id, value) => handleCharacterChange(id, 'prompt', value)}
+                                    />
+                                ))}
+                           </div>
                         </div>
                         
                         <div className="mt-6 bg-slate-800 p-6 rounded-lg shadow-lg flex items-center gap-6">
