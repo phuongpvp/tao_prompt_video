@@ -9,16 +9,13 @@ export const setApiKeys = (keys: string[]) => {
     USER_API_KEYS = keys.map(k => k.trim()).filter(k => k.length > 10);
     currentKeyIndex = 0;
 };
-
 export const clearApiKeys = () => {
     USER_API_KEYS = [];
     currentKeyIndex = 0;
 };
-
 export const hasApiKeys = (): boolean => {
     return USER_API_KEYS.length > 0;
 };
-
 const getNextApiKey = (): string => {
     if (USER_API_KEYS.length === 0) throw new Error("MISSING_KEYS");
     const key = USER_API_KEYS[currentKeyIndex];
@@ -47,14 +44,10 @@ const handleGeminiError = (error: unknown, context: string): Error => {
     }
     
     switch (context) {
-        case 'story generation':
-            return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
-        case 'character generation':
-            return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
-        case 'script generation':
-            return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
-        default:
-            return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
+        case 'story generation': return new Error(`Không thể tạo ý tưởng câu chuyện. (Lỗi: ${originalError})`);
+        case 'character generation': return new Error(`Không thể tạo chi tiết nhân vật. (Lỗi: ${originalError})`);
+        case 'script generation': return new Error(`Không thể tạo kịch bản. (Lỗi: ${originalError})`);
+        default: return new Error(`Đã xảy ra lỗi không xác định. (Lỗi: ${originalError})`);
     }
 };
 
@@ -140,21 +133,21 @@ export const generateScript = async (story: Story, characters: Character[], dura
     
     const isDialogueStyle = scriptStyle === 'Lời thoại';
 
-    // 1. Hướng dẫn cho AI cách viết "dialogues" (Lời thoại / Lời dẫn)
+    // 1. Hướng dẫn cho "dialogues" (Phần này đã đúng)
     const dialoguePromptInstruction = isDialogueStyle
         ? `3. "dialogues": MẢNG các lời thoại giữa các nhân vật (ví dụ: [{"character": "Tên NV", "line": "Lời thoại..."}]). PHẢI có ít nhất 1 lời thoại.`
         : `3. "dialogues": MẢNG CHỨA 1 LỜI DẪN (ví dụ: [{"character": "Narrator", "line": "Lời dẫn..."}]).`;
 
-    // 2. Hướng dẫn cho AI cách viết "veo_prompt" (Prompt video)
+    // 2. Hướng dẫn cho "veo_prompt" (ĐÃ SỬA THEO YÊU CẦU CỦA BẠN)
     const veoPromptInstruction = isDialogueStyle
         ? `
-            - "veo_prompt": (TIẾNG ANH) Mô tả cảnh + tên nhân vật. 
-            - QUAN TRỌNG: Nối TOÀN BỘ nội dung "line" (lời thoại) của cảnh đó vào cuối prompt, đặt trong dấu nháy đơn.
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống như prompt cho Midjourney/DALL-E). PHẢI chứa tên nhân vật. 
+            - QUAN TRỌNG: Nối TOÀN BỘ nội dung "line" (lời thoại) của cảnh đó vào cuối "veo_prompt", đặt trong dấu nháy đơn.
             - CHỈ NỐI NỘI DUNG LỜI THOẠI, KHÔNG thêm "Narrator says:".
             - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong, 'This city isn't big enough for both of us!'"
         `
         : `
-            - "veo_prompt": (TIẾNG ANH) Mô tả cảnh + tên nhân vật.
+            - "veo_prompt": (TIẾNG ANH) Một câu lệnh mô tả hình ảnh chi tiết, súc tích (giống như prompt cho Midjourney/DALL-E). PHẢI chứa tên nhân vật.
             - Y hệt như prompt gốc, KHÔNG chèn lời dẫn vào.
             - Ví dụ: "cinematic close-up of Godzilla roaring at King Kong"
         `;
