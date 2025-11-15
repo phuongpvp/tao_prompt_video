@@ -3,8 +3,8 @@ import { Character } from '../types';
 
 interface CharacterCardProps {
   character: Character;
-  // Cập nhật props
   onNameChange: (id: number, newName: string) => void;
+  // Thêm props này
   onDescriptionChange: (id: number, newDescription: string) => void;
   onPromptChange: (id: number, newPrompt: string) => void;
 }
@@ -16,7 +16,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
     const [copySuccess, setCopySuccess] = useState(false);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(character.prompt);
+        // === SỬA Ở ĐÂY: Tự động chèn "Solid white background." ===
+        navigator.clipboard.writeText(`${character.prompt.trim()}. Solid white background.`);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
     }
@@ -32,7 +33,6 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
                     onChange={(e) => onNameChange(character.id, e.target.value)}
                     className="flex-1 bg-transparent text-2xl font-bold text-cyan-400 p-1 -ml-1 focus:outline-none focus:bg-slate-700 rounded"
                 />
-                {/* === THÊM TAG VAI TRÒ === */}
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
                     character.role === 'Nhân vật chính' 
                     ? 'bg-yellow-500/20 text-yellow-300' 
@@ -47,6 +47,7 @@ const CharacterCard: React.FC<CharacterCardProps> = ({ character, onNameChange, 
                  <textarea
                     rows={5}
                     value={character.description}
+                    // Thêm sự kiện onchange
                     onChange={(e) => onDescriptionChange(character.id, e.target.value)}
                     className="w-full bg-transparent text-slate-300 p-1 focus:outline-none focus:bg-slate-700 rounded resize-none"
                     placeholder="Mô tả nhân vật (Tiếng Việt)"
